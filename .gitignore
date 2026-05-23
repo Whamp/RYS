@@ -5,8 +5,10 @@ __pycache__/
 *.pyd
 .pytest_cache/
 .ruff_cache/
+.pi/
 
 results/
+reviews/
 local/
 models/
 exports/
