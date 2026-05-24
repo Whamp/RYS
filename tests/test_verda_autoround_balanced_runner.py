@@ -23,7 +23,11 @@ def test_autoround_balanced_runner_preserves_requested_autoround_contract():
         in text
     )
 
-    assert 'uv run auto-round' in text
+    assert 'SKIP_UV_SYNC=${SKIP_UV_SYNC:-1}' in text
+    assert 'uv venv --python "${PYTHON_VERSION}" .venv' in text
+    assert '.venv/bin/auto-round' in text
+    assert 'uv run auto-round' not in text
+    assert '\n    uv sync' not in text
     assert '--model "${MODEL_REPO}"' in text
     assert '--scheme "${AUTOROUND_SCHEME}"' in text
     assert '--format "${AUTOROUND_FORMAT}"' in text
@@ -31,7 +35,7 @@ def test_autoround_balanced_runner_preserves_requested_autoround_contract():
     assert '--output_dir "${OUTPUT_DIR}"' in text
 
     assert "INSTALL_FAST_KERNELS=${INSTALL_FAST_KERNELS:-0}" in text
-    assert 'uv pip install --upgrade --no-deps "${AUTOROUND_SPEC}"' in text
+    assert 'uv pip install --python .venv/bin/python --upgrade "${AUTOROUND_SPEC}"' in text
     assert "verify_torch_cuda" in text
     assert "AUTO_UPLOAD=${AUTO_UPLOAD:-1}" in text
     assert "HF_UPLOAD_REPO=${HF_UPLOAD_REPO:-hampsonw/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16}" in text

@@ -30,7 +30,7 @@ BUNDLE_FILE=${BUNDLE_FILE:-${WORKDIR}/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4
 
 PYTHON_VERSION=${PYTHON_VERSION:-3.12}
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
-SKIP_UV_SYNC=${SKIP_UV_SYNC:-0}
+SKIP_UV_SYNC=${SKIP_UV_SYNC:-1}
 INSTALL_FAST_KERNELS=${INSTALL_FAST_KERNELS:-0}
 ALLOW_SLOW_LINEAR_ATTENTION=${ALLOW_SLOW_LINEAR_ATTENTION:-1}
 ALLOW_SMALL_GPU=${ALLOW_SMALL_GPU:-0}
@@ -95,18 +95,21 @@ install_deps() {
   export UV_PYTHON="${PYTHON_VERSION}"
 
   if [ "${SKIP_UV_SYNC}" != "1" ]; then
-    log "Installing repo dependencies with uv sync..."
-    uv sync
+    echo "This AutoRound runner must not run repo uv sync on rented GPUs." >&2
+    echo "Repo sync can install a CUDA-specific PyTorch stack unrelated to the Verda image." >&2
+    echo "Leave SKIP_UV_SYNC=1 unless you are intentionally debugging locally." >&2
+    exit 2
   fi
 
-  log "Installing AutoRound runtime dependencies without changing the repo-pinned PyTorch/CUDA stack..."
-  uv pip install --upgrade datasets py-cpuinfo pydantic
-  log "Installing pinned AutoRound without dependencies: ${AUTOROUND_SPEC}"
-  uv pip install --upgrade --no-deps "${AUTOROUND_SPEC}"
+  log "Creating isolated AutoRound virtualenv without syncing the repo project..."
+  uv venv --python "${PYTHON_VERSION}" .venv
+
+  log "Installing pinned AutoRound and its runtime dependencies into .venv: ${AUTOROUND_SPEC}"
+  uv pip install --python .venv/bin/python --upgrade "${AUTOROUND_SPEC}"
 
   if [ "${INSTALL_FAST_KERNELS}" = "1" ]; then
     log "Installing Qwen3.5/Qwen3.6 linear-attention fast-path deps..."
-    uv pip install --upgrade --no-build-isolation causal-conv1d flash-linear-attention
+    uv pip install --python .venv/bin/python --upgrade --no-build-isolation causal-conv1d flash-linear-attention
   fi
 
   verify_torch_cuda
@@ -115,7 +118,7 @@ install_deps() {
 
 verify_torch_cuda() {
   log "Verifying PyTorch can see CUDA..."
-  uv run python - <<'PY'
+  .venv/bin/python - <<'PY'
 import torch
 print(f"torch={torch.__version__} torch_cuda={torch.version.cuda}")
 print(f"cuda_available={torch.cuda.is_available()}")
@@ -133,7 +136,7 @@ verify_fast_path_deps() {
 
   log "Verifying Qwen linear-attention fast path availability..."
   set +e
-  uv run python - <<'PY'
+  .venv/bin/python - <<'PY'
 from transformers.utils.import_utils import is_causal_conv1d_available, is_flash_linear_attention_available
 
 causal_ok = bool(is_causal_conv1d_available())
@@ -190,7 +193,7 @@ write_metadata() {
   local nvidia_smi="unavailable"
   nvidia_smi=$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>/dev/null | sed ':a;N;$!ba;s/\n/\\n/g' || echo unavailable)
 
-  GIT_COMMIT_CAPTURE="${git_commit}" GIT_STATUS_CAPTURE="${git_status}" NVIDIA_SMI_CAPTURE="${nvidia_smi}" uv run python - <<'PY'
+  GIT_COMMIT_CAPTURE="${git_commit}" GIT_STATUS_CAPTURE="${git_status}" NVIDIA_SMI_CAPTURE="${nvidia_smi}" .venv/bin/python - <<'PY'
 import json
 import os
 import platform
@@ -222,7 +225,7 @@ payload = {
 }
 try:
     payload["uv_pip_freeze"] = subprocess.check_output(
-        ["uv", "pip", "freeze"], text=True, stderr=subprocess.STDOUT
+        ["uv", "pip", "freeze", "--python", ".venv/bin/python"], text=True, stderr=subprocess.STDOUT
     ).splitlines()
 except Exception as exc:
     payload["uv_pip_freeze_error"] = str(exc)
@@ -249,7 +252,7 @@ run_autoround() {
   # shellcheck disable=SC2206
   local extra_args=( ${EXTRA_AUTOROUND_ARGS} )
 
-  uv run auto-round \
+  .venv/bin/auto-round \
     --model "${MODEL_REPO}" \
     --scheme "${AUTOROUND_SCHEME}" \
     --format "${AUTOROUND_FORMAT}" \
@@ -303,7 +306,7 @@ upload_output() {
   upload_dir=$(resolve_model_output_dir)
   log "Uploading ${upload_dir} -> https://huggingface.co/${HF_UPLOAD_REPO}"
 
-  HF_UPLOAD_TOKEN="${token}" HF_UPLOAD_DIR="${upload_dir}" uv run python - <<'PY'
+  HF_UPLOAD_TOKEN="${token}" HF_UPLOAD_DIR="${upload_dir}" .venv/bin/python - <<'PY'
 import os
 from huggingface_hub import HfApi
 

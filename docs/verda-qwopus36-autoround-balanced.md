@@ -6,7 +6,13 @@ This runbook covers the one-time AutoRound W4A16 quantization of:
 - Output intent: `Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16`
 - Runner: `scripts/verda_run_qwopus36_autoround_balanced.sh`
 
-The runner keeps AutoRound's W4A16 quality defaults and only applies the sensitive-layer policy. It installs AutoRound without letting it replace the repo-pinned PyTorch/CUDA stack, then verifies `torch.cuda.is_available()` before starting the paid run.
+The runner keeps AutoRound's W4A16 quality defaults and only applies the sensitive-layer policy. It creates an isolated `.venv` for AutoRound and **does not run repo `uv sync`**, so the repo's CUDA-specific PyTorch settings cannot fight the Verda image. It then verifies `torch.cuda.is_available()` before starting the paid run.
+
+Use a CUDA 13 Verda image for the RTX PRO 6000 Blackwell CC spot instance, for example:
+
+```text
+ubuntu-24.04-cuda-13.0-open-docker
+```
 
 
 ```text
