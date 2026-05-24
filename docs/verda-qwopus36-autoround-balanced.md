@@ -14,6 +14,14 @@ Use a CUDA 13 Verda image for the RTX PRO 6000 Blackwell CC spot instance, for e
 ubuntu-24.04-cuda-13.0-open-docker
 ```
 
+The CC variant can boot with `CC GPUs Ready State: Not Ready`, which makes CUDA return `cuInit 802` even though `nvidia-smi` works. The runner checks this and runs:
+
+```bash
+nvidia-smi conf-compute -srs 1
+```
+
+before verifying PyTorch CUDA.
+
 
 ```text
 ignore_layers = visual,vision,lm_head,mtp.fc,linear_attn

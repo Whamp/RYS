@@ -34,6 +34,7 @@ def test_autoround_balanced_runner_preserves_requested_autoround_contract():
     assert '--ignore_layers "${AUTOROUND_IGNORE_LAYERS}"' in text
     assert '--output_dir "${OUTPUT_DIR}"' in text
 
+    assert "nvidia-smi conf-compute -srs 1" in text
     assert "INSTALL_FAST_KERNELS=${INSTALL_FAST_KERNELS:-0}" in text
     assert 'uv pip install --python .venv/bin/python --upgrade "${AUTOROUND_SPEC}"' in text
     assert "verify_torch_cuda" in text

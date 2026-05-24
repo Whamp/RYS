@@ -173,6 +173,14 @@ verify_gpu() {
   fi
   nvidia-smi
 
+  if nvidia-smi conf-compute -grs >/tmp/rys-conf-compute-ready.txt 2>/dev/null; then
+    if grep -qi 'not-ready' /tmp/rys-conf-compute-ready.txt; then
+      log "Confidential-compute GPU is not ready; setting GPUs ready state..."
+      nvidia-smi conf-compute -srs 1
+      nvidia-smi conf-compute -grs
+    fi
+  fi
+
   local gpu_memory_mib
   gpu_memory_mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -n1 | tr -d ' ')
   if [ "${gpu_memory_mib}" -lt "${MIN_GPU_MEMORY_MIB}" ] && [ "${ALLOW_SMALL_GPU}" != "1" ]; then
