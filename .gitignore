@@ -6,12 +6,16 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .pi/
+.psst/
+.napkin/
+.obsidian/
 
 results/
 reviews/
 local/
 models/
 exports/
+artifacts/
 dist/
 build/
 *.log

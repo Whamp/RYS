@@ -1,4 +1,14 @@
-from hf_export.common import build_exported_config, build_tensor_name_mapping
+from pathlib import Path
+
+from hf_export.common import build_exported_config, build_tensor_name_mapping, exported_shard_total_size
+
+
+def test_exported_shard_total_size_matches_hf_shard_names(tmp_path: Path) -> None:
+    (tmp_path / "model-00001-of-00002.safetensors").write_bytes(b"abc")
+    (tmp_path / "model-00002-of-00002.safetensors").write_bytes(b"defgh")
+    (tmp_path / "model.safetensors.index.json").write_text("{}")
+
+    assert exported_shard_total_size(tmp_path) == 8
 
 
 def test_build_tensor_name_mapping_duplicates_decoder_layers() -> None:

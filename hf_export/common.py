@@ -33,6 +33,10 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text())
 
 
+def exported_shard_total_size(output_dir: Path) -> int:
+    return sum(path.stat().st_size for path in output_dir.glob("model-*.safetensors"))
+
+
 def save_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
 

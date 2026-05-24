@@ -17,6 +17,7 @@ from hf_export.common import (
     build_tensor_name_mapping,
     collect_layer_tensors,
     duplication_counts,
+    exported_shard_total_size,
     load_json,
     save_json,
 )
@@ -240,7 +241,7 @@ def main() -> None:
         source_weight_map=source_weight_map,
     )
 
-    total_size = sum(path.stat().st_size for path in spec.output_dir.glob("model.safetensors-*.safetensors"))
+    total_size = exported_shard_total_size(spec.output_dir)
     index_payload["metadata"]["total_size"] = int(total_size)
     save_json(spec.output_dir / MODEL_INDEX_NAME, index_payload)
     print(f"[export] wrote {len(shard_names)} shard files, total_size={total_size}")
