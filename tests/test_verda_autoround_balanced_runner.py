@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import re
 from pathlib import Path
 
 
@@ -29,6 +30,12 @@ def test_autoround_balanced_runner_preserves_requested_autoround_contract():
     assert '--ignore_layers "${AUTOROUND_IGNORE_LAYERS}"' in text
     assert '--output_dir "${OUTPUT_DIR}"' in text
 
+    assert "AUTO_UPLOAD=${AUTO_UPLOAD:-1}" in text
+    assert "HF_UPLOAD_REPO=${HF_UPLOAD_REPO:-hampsonw/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16}" in text
+    assert "api.create_repo" in text
+    assert "api.upload_folder" in text
+    assert "HF_UPLOAD_TOKEN" in text
+
     # AutoRound quality defaults should remain in charge unless explicitly overridden.
     assert "--seqlen" not in text
     assert "--nsamples" not in text
@@ -36,3 +43,8 @@ def test_autoround_balanced_runner_preserves_requested_autoround_contract():
     assert "--group_size" not in text
     assert "--asym" not in text
     assert "--dataset" not in text
+
+
+def test_autoround_balanced_runner_does_not_embed_hf_tokens():
+    text = SCRIPT.read_text()
+    assert not re.search(r"hf_[A-Za-z0-9]{20,}", text)

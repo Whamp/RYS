@@ -46,6 +46,10 @@ AUTOROUND_IGNORE_LAYERS=${AUTOROUND_IGNORE_LAYERS:-visual,vision,lm_head,mtp.fc,
 ENABLE_TORCH_COMPILE=${ENABLE_TORCH_COMPILE:-0}
 EXTRA_AUTOROUND_ARGS=${EXTRA_AUTOROUND_ARGS:-}
 
+AUTO_UPLOAD=${AUTO_UPLOAD:-1}
+HF_UPLOAD_REPO=${HF_UPLOAD_REPO:-hampsonw/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16}
+HF_UPLOAD_PRIVATE=${HF_UPLOAD_PRIVATE:-0}
+
 mkdir -p "${WORKDIR}" "${OUTPUT_ROOT}" "${LOG_DIR}"
 
 log() {
@@ -188,6 +192,9 @@ payload = {
     "autoround_ignore_layers": os.environ.get("AUTOROUND_IGNORE_LAYERS"),
     "enable_torch_compile": os.environ.get("ENABLE_TORCH_COMPILE"),
     "extra_autoround_args": os.environ.get("EXTRA_AUTOROUND_ARGS"),
+    "auto_upload": os.environ.get("AUTO_UPLOAD"),
+    "hf_upload_repo": os.environ.get("HF_UPLOAD_REPO"),
+    "hf_upload_private": os.environ.get("HF_UPLOAD_PRIVATE"),
     "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
     "repo_dir": os.environ.get("REPO_DIR"),
     "repo_url": os.environ.get("REPO_URL"),
@@ -237,6 +244,72 @@ run_autoround() {
     "${extra_args[@]}"
 }
 
+resolve_model_output_dir() {
+  if [ -f "${OUTPUT_DIR}/config.json" ]; then
+    printf '%s\n' "${OUTPUT_DIR}"
+    return
+  fi
+
+  if [ ! -d "${OUTPUT_DIR}" ]; then
+    echo "AutoRound output dir ${OUTPUT_DIR} does not exist." >&2
+    return 1
+  fi
+
+  local candidates=()
+  while IFS= read -r config_path; do
+    candidates+=("$(dirname "${config_path}")")
+  done < <(find "${OUTPUT_DIR}" -mindepth 2 -maxdepth 3 -type f -name config.json | sort)
+
+  if [ "${#candidates[@]}" -eq 1 ]; then
+    printf '%s\n' "${candidates[0]}"
+    return
+  fi
+
+  echo "Could not uniquely resolve AutoRound model output directory under ${OUTPUT_DIR}." >&2
+  printf 'Candidates:\n' >&2
+  printf '  %s\n' "${candidates[@]}" >&2
+  return 1
+}
+
+upload_output() {
+  if [ "${AUTO_UPLOAD}" != "1" ]; then
+    log "AUTO_UPLOAD=${AUTO_UPLOAD}; skipping Hugging Face upload."
+    return
+  fi
+
+  local token="${HF_WRITE_TOKEN:-${HF_TOKEN:-}}"
+  if [ -z "${token}" ]; then
+    echo "AUTO_UPLOAD=1 but neither HF_WRITE_TOKEN nor HF_TOKEN is set." >&2
+    echo "Set a write-capable token before starting the run, or set AUTO_UPLOAD=0." >&2
+    exit 5
+  fi
+
+  local upload_dir
+  upload_dir=$(resolve_model_output_dir)
+  log "Uploading ${upload_dir} -> https://huggingface.co/${HF_UPLOAD_REPO}"
+
+  HF_UPLOAD_TOKEN="${token}" HF_UPLOAD_DIR="${upload_dir}" uv run python - <<'PY'
+import os
+from huggingface_hub import HfApi
+
+repo_id = os.environ["HF_UPLOAD_REPO"]
+folder = os.environ["HF_UPLOAD_DIR"]
+token = os.environ["HF_UPLOAD_TOKEN"]
+private = os.environ.get("HF_UPLOAD_PRIVATE", "0") == "1"
+
+api = HfApi(token=token)
+api.create_repo(repo_id=repo_id, repo_type="model", private=private, exist_ok=True)
+api.upload_folder(
+    repo_id=repo_id,
+    repo_type="model",
+    folder_path=folder,
+    token=token,
+    commit_message="Upload Qwopus3.6 RYS Balanced AutoRound W4A16",
+)
+print(f"Uploaded {folder} to https://huggingface.co/{repo_id}")
+PY
+}
+
 bundle_output() {
   if [ ! -d "${OUTPUT_DIR}" ]; then
     log "Output dir ${OUTPUT_DIR} not found; skipping bundle. AutoRound may have created a derived subdirectory inside it."
@@ -254,6 +327,7 @@ bundle_output() {
 main() {
   export RUN_ID MODEL_REPO OUTPUT_DIR AUTOROUND_REF AUTOROUND_SPEC AUTOROUND_SCHEME AUTOROUND_FORMAT
   export AUTOROUND_IGNORE_LAYERS ENABLE_TORCH_COMPILE EXTRA_AUTOROUND_ARGS CUDA_VISIBLE_DEVICES
+  export AUTO_UPLOAD HF_UPLOAD_REPO HF_UPLOAD_PRIVATE
   export REPO_DIR REPO_URL REPO_REF METADATA_FILE
 
   prepare_repo
@@ -263,6 +337,7 @@ main() {
   log "Logging AutoRound run to ${RUN_LOG}"
   run_autoround 2>&1 | tee "${RUN_LOG}"
   write_metadata
+  upload_output
   bundle_output
   log "Done. Output root: ${OUTPUT_DIR}"
 }

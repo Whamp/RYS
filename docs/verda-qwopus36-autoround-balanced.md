@@ -56,13 +56,21 @@ git checkout "$REPO_REF"
 
 ## Run
 
+Use a write-capable Hugging Face token before starting the long run. The runner uploads automatically after quantization so the paid VM does not sit idle waiting for a manual upload command.
+
 ```bash
-export HF_TOKEN=<huggingface-token-if-needed>
+export HF_WRITE_TOKEN=<huggingface-read-write-token>
 export REPO_REF=will/qwopus36-autoround-balanced-verda
 ./scripts/verda_run_qwopus36_autoround_balanced.sh
 ```
 
-The runner executes the equivalent of:
+If you intentionally want to quantize without uploading:
+
+```bash
+export AUTO_UPLOAD=0
+```
+
+The runner quantizes with the equivalent of:
 
 ```bash
 auto-round \
@@ -90,6 +98,23 @@ dataset: NeelNanda/pile-10k
 ```
 
 We intentionally do not override these in the runner.
+
+## Upload
+
+By default the runner creates/uploads to:
+
+```text
+https://huggingface.co/hampsonw/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16
+```
+
+Override if needed:
+
+```bash
+export HF_UPLOAD_REPO=hampsonw/another-repo-name
+export HF_UPLOAD_PRIVATE=1  # optional; default is public
+```
+
+Do not paste tokens into logs or commit them. Rotate the write token after the upload is complete.
 
 ## Outputs
 
