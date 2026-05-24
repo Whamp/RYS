@@ -6,7 +6,8 @@ This runbook covers the one-time AutoRound W4A16 quantization of:
 - Output intent: `Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16`
 - Runner: `scripts/verda_run_qwopus36_autoround_balanced.sh`
 
-The runner keeps AutoRound's W4A16 quality defaults and only applies the sensitive-layer policy:
+The runner keeps AutoRound's W4A16 quality defaults and only applies the sensitive-layer policy. It installs AutoRound without letting it replace the repo-pinned PyTorch/CUDA stack, then verifies `torch.cuda.is_available()` before starting the paid run.
+
 
 ```text
 ignore_layers = visual,vision,lm_head,mtp.fc,linear_attn
@@ -24,7 +25,7 @@ The current gamble target is:
 FIN-03 spot
 ```
 
-AutoRound is not assumed to be resumable mid-run. If the spot instance is reclaimed, the process dies and the quantization should be rerun from the beginning.
+AutoRound is not assumed to be resumable mid-run. If the spot instance is reclaimed, the process dies and the quantization should be rerun from the beginning. Qwen fast-kernel installation is disabled by default for this AutoRound run to avoid source-building CUDA extensions on the rented VM; set `INSTALL_FAST_KERNELS=1` only if intentionally testing that path.
 
 Use Verda's keep-detached volume policy so setup, downloads, logs, and partial files survive reclaim:
 

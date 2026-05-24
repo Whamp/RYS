@@ -31,8 +31,8 @@ BUNDLE_FILE=${BUNDLE_FILE:-${WORKDIR}/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4
 PYTHON_VERSION=${PYTHON_VERSION:-3.12}
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 SKIP_UV_SYNC=${SKIP_UV_SYNC:-0}
-INSTALL_FAST_KERNELS=${INSTALL_FAST_KERNELS:-1}
-ALLOW_SLOW_LINEAR_ATTENTION=${ALLOW_SLOW_LINEAR_ATTENTION:-0}
+INSTALL_FAST_KERNELS=${INSTALL_FAST_KERNELS:-0}
+ALLOW_SLOW_LINEAR_ATTENTION=${ALLOW_SLOW_LINEAR_ATTENTION:-1}
 ALLOW_SMALL_GPU=${ALLOW_SMALL_GPU:-0}
 MIN_GPU_MEMORY_MIB=${MIN_GPU_MEMORY_MIB:-90000}
 
@@ -99,15 +99,30 @@ install_deps() {
     uv sync
   fi
 
-  log "Installing pinned AutoRound: ${AUTOROUND_SPEC}"
-  uv pip install --upgrade "${AUTOROUND_SPEC}"
+  log "Installing AutoRound runtime dependencies without changing the repo-pinned PyTorch/CUDA stack..."
+  uv pip install --upgrade datasets py-cpuinfo pydantic
+  log "Installing pinned AutoRound without dependencies: ${AUTOROUND_SPEC}"
+  uv pip install --upgrade --no-deps "${AUTOROUND_SPEC}"
 
   if [ "${INSTALL_FAST_KERNELS}" = "1" ]; then
     log "Installing Qwen3.5/Qwen3.6 linear-attention fast-path deps..."
     uv pip install --upgrade --no-build-isolation causal-conv1d flash-linear-attention
   fi
 
+  verify_torch_cuda
   verify_fast_path_deps
+}
+
+verify_torch_cuda() {
+  log "Verifying PyTorch can see CUDA..."
+  uv run python - <<'PY'
+import torch
+print(f"torch={torch.__version__} torch_cuda={torch.version.cuda}")
+print(f"cuda_available={torch.cuda.is_available()}")
+if not torch.cuda.is_available():
+    raise SystemExit(1)
+print(f"device={torch.cuda.get_device_name(0)}")
+PY
 }
 
 verify_fast_path_deps() {

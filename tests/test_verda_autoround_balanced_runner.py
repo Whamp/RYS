@@ -30,6 +30,9 @@ def test_autoround_balanced_runner_preserves_requested_autoround_contract():
     assert '--ignore_layers "${AUTOROUND_IGNORE_LAYERS}"' in text
     assert '--output_dir "${OUTPUT_DIR}"' in text
 
+    assert "INSTALL_FAST_KERNELS=${INSTALL_FAST_KERNELS:-0}" in text
+    assert 'uv pip install --upgrade --no-deps "${AUTOROUND_SPEC}"' in text
+    assert "verify_torch_cuda" in text
     assert "AUTO_UPLOAD=${AUTO_UPLOAD:-1}" in text
     assert "HF_UPLOAD_REPO=${HF_UPLOAD_REPO:-hampsonw/Qwopus3.6-27B-v2-RYS-Balanced-AutoRound-W4A16}" in text
     assert "api.create_repo" in text
